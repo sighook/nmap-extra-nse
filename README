@@ -1,0 +1,13 @@
+About
+-----
+
+Nmap scripts that aren't merged to upstream.
+The scripts have prefix (a.e. 0001-), it's a "Pull Request" number.
+
+
+Usage
+-----
+
+for nse in *.nse; do mv $nse ${nse#*-}; done
+sudo cp *.nse /usr/share/nmap/scripts/
+sudo nmap --script-updatedb
