@@ -73,9 +73,7 @@ be disabled using the <code>mssql.scanned-ports-only</code> script argument.
 
 author = "James Otten"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = {
-  "intrusive",
-}
+categories = { "intrusive", }
 
 dependencies = {
   "ms-sql-brute",
