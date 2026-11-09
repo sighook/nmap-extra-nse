@@ -1,6 +1,6 @@
-local ipOps = require "ipOps"
+local geoip = require "geoip"
+local geolocation = require "geolocation"
 local io = require "io"
-local mmdb = require "mmdb"
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local tab = require "tab"
@@ -16,7 +16,8 @@ geolocation database estimates, not verified physical router positions.
 -- nmap -sn --traceroute --script traceroute-geolocation-mmdb \
 --   --script-args traceroute-geolocation-mmdb.db=/usr/share/GeoIP/GeoLite2-City.mmdb example.com
 --
--- @args traceroute-geolocation-mmdb.db Path to GeoLite2 City database.
+-- @args geolocation.provider Lookup provider (currently mmdb; offline only).
+-- @args traceroute-geolocation-mmdb.db Path to GeoLite2 City or Country MMDB.
 -- @args traceroute-geolocation-mmdb.asn Optional path to GeoLite2 ASN database.
 -- @args traceroute-geolocation-mmdb.kmlfile Optional KML file for point markers;
 --       use with a single target to avoid overwriting between hosts.
@@ -36,7 +37,9 @@ author = "sighook and contributors"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = { "safe", "discovery" }
 
+-- Backend is selected via geolocation.provider; existing script arguments remain valid.
 local basename = SCRIPT_NAME
+local provider_name = stdnse.get_script_args("geolocation.provider") or "mmdb"
 local db_path = stdnse.get_script_args(basename .. ".db") or
   nmap.fetchfile("nselib/data/GeoLite2-City.mmdb") or
   "/usr/share/GeoIP/GeoLite2-City.mmdb"
@@ -45,38 +48,6 @@ local kml_path = stdnse.get_script_args(basename .. ".kmlfile")
 
 hostrule = function(host)
   return host.traceroute ~= nil and #host.traceroute > 0
-end
-
-local function nonpublic(ip)
-  local private = ipOps.isPrivate(ip)
-  if private then return true end
-  -- ipOps.isPrivate() does not currently include shared address space.
-  if not ip:find(":", 1, true) then
-    return ipOps.ip_in_range(ip, "100.64.0.0/10") == true
-  end
-  return false
-end
-
-local function description_of(record)
-  if type(record) ~= "table" then return nil end
-  local location = record.location
-  if type(location) ~= "table" or
-     type(location.latitude) ~= "number" or
-     type(location.longitude) ~= "number" then
-    return nil
-  end
-  local country = record.country or record.registered_country or {}
-  local city = record.city or {}
-  local function english(value)
-    return type(value) == "table" and type(value.names) == "table" and
-      value.names.en or nil
-  end
-  return {
-    lat = location.latitude,
-    lon = location.longitude,
-    country = english(country),
-    city = english(city),
-  }
 end
 
 local function escape_xml(s)
@@ -102,17 +73,14 @@ local function write_kml(path, points)
 end
 
 local function run(host)
-  local db, err = mmdb.open(db_path)
-  if not db then return "ERROR: " .. err end
-  local asn, aerr
-  if asn_path then
-    asn, aerr = mmdb.open(asn_path)
-    if not asn then db:close(); return "ERROR: " .. aerr end
-  end
+  local provider, err = geolocation.open({
+    provider = provider_name, db = db_path, asn = asn_path,
+  })
+  if not provider then return "ERROR: " .. err end
 
   local output = tab.new(5)
   tab.addrow(output, "HOP", "RTT", "ADDRESS", "GEOLOCATION", "ASN")
-  local structured, points, cache = {}, {}, {}
+  local structured, points = {}, {}
   local problems = {}
   for hop_number, hop in ipairs(host.traceroute) do
     if not hop.ip then
@@ -125,55 +93,42 @@ local function run(host)
       local row = { hop = hop_number, ip = ip, hostname = name, rtt = rtt }
       local label = name and (name .. " (" .. ip .. ")") or ip
       local geographic, asn_label = "no MMDB record", "-"
-      if nonpublic(ip) then
-        geographic = "non-public"
-        row.status = "non-public"
+      local result, lookup_err = provider:lookup(ip)
+      if not result then
+        problems[#problems + 1] = ip .. ": " .. tostring(lookup_err)
+        geographic = "lookup error"
+        row.status = "lookup error"
       else
-        if not cache[ip] then
-          local ok, record = pcall(db.lookup, db, ip)
-          if not ok then
-            problems[#problems + 1] = ip .. ": " .. tostring(record)
-            record = nil
-          end
-          local geo = description_of(record)
-          local number, organization
-          if asn then
-            local aok, arecord = pcall(asn.lookup, asn, ip)
-            if not aok then
-              problems[#problems + 1] = ip .. " ASN: " .. tostring(arecord)
-            elseif type(arecord) == "table" then
-              number = arecord.autonomous_system_number
-              organization = arecord.autonomous_system_organization
-            end
-          end
-          cache[ip] = { geo = geo, number = number, organization = organization }
+        row.status = result.status
+        if result.asn then
+          asn_label = "AS" .. tostring(result.asn)
+          row.asn = result.asn
+          row.organization = result.organization
         end
-        local lookup = cache[ip]
-        if lookup.number then
-          asn_label = "AS" .. tostring(lookup.number)
-          row.asn = lookup.number
-          row.organization = lookup.organization
-        end
-        if lookup.geo then
-          local geo = lookup.geo
-          geographic = string.format("%.4f,%.4f %s%s", geo.lat, geo.lon,
-            geo.country or "Unknown", geo.city and (" (" .. geo.city .. ")") or "")
-          row.latitude, row.longitude = geo.lat, geo.lon
-          row.country, row.city = geo.country, geo.city
+        if result.status == "located" then
+          geographic = string.format("%.4f,%.4f %s%s", result.latitude,
+            result.longitude, result.country or "Unknown",
+            result.city and (" (" .. result.city .. ")") or "")
+          row.latitude, row.longitude = result.latitude, result.longitude
           points[#points + 1] = { hop = hop_number, ip = ip,
-            lat = geo.lat, lon = geo.lon }
-          row.status = "located"
-        else
-          row.status = "no MMDB record"
+            lat = result.latitude, lon = result.longitude }
+          geoip.add(ip, result.latitude, result.longitude)
+        elseif result.status == "country-only" then
+          geographic = result.country or result.continent or result.city
+        elseif result.status == "asn-only" then
+          geographic = "no geographic record"
+        elseif result.status == "non-public" then
+          geographic = "non-public"
         end
+        row.country, row.city, row.continent = result.country,
+          result.city, result.continent
       end
       tab.addrow(output, hop_number, rtt and string.format("%.2f ms", rtt) or "-",
         label, geographic, asn_label)
       structured[#structured + 1] = row
     end
   end
-  db:close()
-  if asn then asn:close() end
+  provider:close()
   local display = tab.dump(output)
   if kml_path then
     local ok, why = write_kml(kml_path, points)
