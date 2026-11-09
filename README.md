@@ -12,15 +12,26 @@ See [CONTRIB.md](CONTRIB.md) for the upstream status audit and exceptions.
 These files are **not all part of official Nmap**. PR state is not an assessment of
 security, correctness, or compatibility with current NSE libraries.
 
-## Offline traceroute geolocation (maintained)
+## Offline geolocation (maintained)
 
-`traceroute-geolocation-mmdb.nse` annotates Nmap traceroute hops using a local
-GeoLite2 City MMDB. An optional GeoLite2 ASN MMDB supplies ASN details. It does
-not call GeoPlugin or any other remote API. `nselib/mmdb.lua` is a bounded Lua
-MMDB reader. The databases themselves are **not** redistributed here.
+Two independently maintained scripts use the same local lookup provider:
 
-The City database is required; ASN is optional. The Country database is not
-used by this script, but may be useful to other tools. The examples below use
+- `traceroute-geolocation-mmdb.nse` annotates traceroute hops and optionally
+  writes KML point markers.
+- `ip-geolocation-mmdb.nse` geolocates scanned hosts and publishes valid
+  coordinates through Nmap's existing `geoip.lua` registry for map exporters.
+
+`nselib/geolocation.lua` owns the provider interface, address classification,
+record normalization, and lookup cache. `nselib/mmdb.lua` is the bounded MMDB
+binary reader. The scripts do not invoke GeoPlugin or any other remote API.
+Provider selection is via `geolocation.provider`; currently only the offline
+`mmdb` provider is implemented, and it is the default.
+
+A GeoLite2 City or Country database can be used as the primary database. City
+provides coordinates when available; Country does not. An optional GeoLite2
+ASN MMDB supplies ASN details. A country-only record remains a valid lookup,
+but never creates synthetic map coordinates. Databases are **not** redistributed
+here. The examples below use
 [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb), a third-party
 mirror of MaxMind's GeoLite2 data. For regular updates, prefer MaxMind's
 [official `geoipupdate` instructions](https://dev.maxmind.com/geoip/updating-databases/)
@@ -40,7 +51,9 @@ RUN mkdir -p /usr/share/nmap/nselib/data && \
     curl -fLsS --retry 3 -o /usr/share/nmap/nselib/data/GeoLite2-Country.mmdb "${DB_URL}/GeoLite2-Country.mmdb"
 
 COPY nselib/mmdb.lua /usr/share/nmap/nselib/mmdb.lua
+COPY nselib/geolocation.lua /usr/share/nmap/nselib/geolocation.lua
 COPY scripts/traceroute-geolocation-mmdb.nse /usr/share/nmap/scripts/traceroute-geolocation-mmdb.nse
+COPY scripts/ip-geolocation-mmdb.nse /usr/share/nmap/scripts/ip-geolocation-mmdb.nse
 ```
 
 The `COPY` source paths are relative to the Docker build context; prefix them
@@ -54,9 +67,10 @@ fail in restricted container builds due to executable file capabilities.
 From the repository root, install the script and its library:
 
 ```sh
-sudo install -m 644 nselib/mmdb.lua /usr/share/nmap/nselib/mmdb.lua
+sudo install -m 644 nselib/mmdb.lua nselib/geolocation.lua \
+  /usr/share/nmap/nselib/
 sudo install -m 644 scripts/traceroute-geolocation-mmdb.nse \
-  /usr/share/nmap/scripts/traceroute-geolocation-mmdb.nse
+  scripts/ip-geolocation-mmdb.nse /usr/share/nmap/scripts/
 ```
 
 Download the MMDB files into your current directory, then install them:
@@ -73,7 +87,7 @@ sudo install -m 644 GeoLite2-ASN.mmdb GeoLite2-City.mmdb GeoLite2-Country.mmdb \
 
 ### Run
 
-The same invocation works on the host or inside a container:
+The traceroute command (host or Docker) remains unchanged:
 
 ```sh
 nmap -sn --traceroute \
@@ -81,6 +95,24 @@ nmap -sn --traceroute \
   --script-args 'traceroute-geolocation-mmdb.db=/usr/share/nmap/nselib/data/GeoLite2-City.mmdb,traceroute-geolocation-mmdb.asn=/usr/share/nmap/nselib/data/GeoLite2-ASN.mmdb' \
   example.com
 ```
+
+Geolocate a scanned host using the same provider:
+
+```sh
+nmap -sn \
+  --script /usr/share/nmap/scripts/ip-geolocation-mmdb.nse \
+  --script-args 'ip-geolocation-mmdb.db=/usr/share/nmap/nselib/data/GeoLite2-City.mmdb,ip-geolocation-mmdb.asn=/usr/share/nmap/nselib/data/GeoLite2-ASN.mmdb' \
+  example.com
+```
+
+To use a Country database, replace the `.db` path with `GeoLite2-Country.mmdb`.
+To select the only current backend explicitly, add `geolocation.provider=mmdb`.
+An unsupported provider or unreadable database returns an error rather than
+silently falling back to an external HTTP service.
+
+For host maps, the existing upstream `ip-geolocation-map-kml.nse` can consume
+coordinates registered by `ip-geolocation-mmdb.nse` when both scripts run in
+the same scan. Country-only locations do not enter that coordinate registry.
 
 A `traceroute-geolocation-mmdb.kmlfile=/path/route.kml` argument writes KML
 **point markers**, not invented physical links between routers. Use a distinct
@@ -97,12 +129,15 @@ required. The Python script generates data; the actual reader is tested by Lua.
 mkdir -p tests/fixtures
 python3 tests/make_fixture.py tests/fixtures
 lua5.4 tests/test_mmdb.lua "$PWD"
+lua5.4 tests/test_geolocation.lua "$PWD"
 lua5.4 tests/test_nse.lua "$PWD"
+lua5.4 tests/test_host_nse.lua "$PWD"
 ```
 
-The script has also been exercised with a real GeoLite2 database in a Kali
-7.991 container, but treat that as a manual integration smoke test, **not** a
-claim that all datasets or Nmap versions have been validated.
+The earlier standalone traceroute implementation was exercised with a real
+GeoLite2 database in Nmap 7.991 inside Docker. This provider refactor and the
+new host script still need a real-database integration run; synthetic tests
+do not establish compatibility with every dataset or Nmap version.
 
 ## Third-party PR snapshots
 

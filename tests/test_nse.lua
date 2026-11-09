@@ -15,9 +15,18 @@ package.preload.ipOps = function()
     end,
     isPrivate = function(ip) return ip:sub(1,4) == "192." end,
     ip_in_range = function(ip, range)
-      return range == "100.64.0.0/10" and ip:sub(1,4) == "100."
+      assert(range == "100.64.0.0/10")
+      local first, second = ip:match("^(%d+)%.(%d+)%.")
+      return tonumber(first) == 100 and tonumber(second) >= 64 and
+        tonumber(second) <= 127
     end,
   }
+end
+local registered = {}
+package.preload.geoip = function()
+  return { add = function(ip, latitude, longitude)
+    registered[ip] = {latitude, longitude}
+  end }
 end
 package.preload.nmap = function() return { fetchfile = function() return nil end } end
 package.preload.stdnse = function()
@@ -63,6 +72,9 @@ assert(rows[4].status == "located")
 assert(rows[4].country == "Testland" and rows[4].city == "Testville")
 assert(rows[4].latitude == 47.12345)
 assert(rows[4].asn == 13335 and rows[4].organization == "Test ISP")
+assert(registered["142.251.110.101"][1] == 47.12345)
+assert(registered["192.168.100.1"] == nil)
+assert(registered["100.64.87.254"] == nil)
 assert(rows[5].status == "timeout")
 assert(display:find("Testland") and display:find("non%-public"))
 local f = assert(io.open(base .. "/tests/fixtures/output.kml", "r"))

@@ -44,11 +44,17 @@ def node(record_size, left, right):
     raise ValueError(record_size)
 
 
-def make(path, record_size=24, ip_version=4, pointers=False, asn=False):
+def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=False, invalid_location=False):
     # One-node tree, left half: no data, right half: City record.
     data = encode({'country': {'names': {'en': 'Testland'}},
                    'city': {'names': {'en': 'Testville'}},
                    'location': {'latitude': 47.12345, 'longitude': 28.98765}})
+    if country:
+        data = encode({'country': {'names': {'en': 'Testland'}},
+                       'continent': {'names': {'en': 'Testcontinent'}}})
+    if invalid_location:
+        data = encode({'country': {'names': {'en': 'Testland'}},
+                       'location': {'latitude': 91.0, 'longitude': 181.0}})
     if asn:
         data = encode({'autonomous_system_number': 13335,
                        'autonomous_system_organization': 'Test ISP'})
@@ -62,7 +68,7 @@ def make(path, record_size=24, ip_version=4, pointers=False, asn=False):
         'node_count': count,
         'record_size': record_size,
         'ip_version': ip_version,
-        'database_type': 'GeoLite2-ASN' if asn else 'GeoLite2-City',
+        'database_type': 'GeoLite2-ASN' if asn else ('GeoLite2-Country' if country else 'GeoLite2-City'),
         'binary_format_major_version': 2,
         'binary_format_minor_version': 0,
         'build_epoch': 1780000000,
@@ -87,4 +93,6 @@ if __name__ == '__main__':
     make(Path(sys.argv[1]) / 'city-v6.mmdb', 24, 6)
     make(Path(sys.argv[1]) / 'pointer.mmdb', 24, pointers=True)
     make(Path(sys.argv[1]) / 'asn.mmdb', 24, asn=True)
+    make(Path(sys.argv[1]) / 'country.mmdb', 24, country=True)
+    make(Path(sys.argv[1]) / 'invalid-location.mmdb', 24, invalid_location=True)
     (Path(sys.argv[1]) / 'invalid.mmdb').write_bytes(b'not a maxmind database')
