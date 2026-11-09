@@ -69,6 +69,10 @@ action = function(host)
     if result.latitude then
       lines[#lines + 1] = string.format("coordinates: %.5f, %.5f",
         result.latitude, result.longitude)
+      if result.accuracy_radius_km then
+        lines[#lines + 1] = "accuracy radius: " ..
+          tostring(result.accuracy_radius_km) .. " km"
+      end
     end
     if result.asn then
       lines[#lines + 1] = "ASN: AS" .. tostring(result.asn) ..

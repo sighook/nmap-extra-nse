@@ -30,6 +30,7 @@ for _, size in ipairs({24, 28, 32}) do
   assert(record.city.names.en == "Testville", "city " .. size)
   assert(math.abs(record.location.latitude - 47.12345) < 1e-7)
   assert(math.abs(record.location.longitude - 28.98765) < 1e-7)
+  assert(record.location.accuracy_radius == 1000)
   assert(db:lookup("1.1.1.1") == nil)
   db:close()
 end

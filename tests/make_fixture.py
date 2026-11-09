@@ -48,13 +48,15 @@ def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=
     # One-node tree, left half: no data, right half: City record.
     data = encode({'country': {'names': {'en': 'Testland'}},
                    'city': {'names': {'en': 'Testville'}},
-                   'location': {'latitude': 47.12345, 'longitude': 28.98765}})
+                   'location': {'latitude': 47.12345, 'longitude': 28.98765,
+                                'accuracy_radius': 1000}})
     if country:
         data = encode({'country': {'names': {'en': 'Testland'}},
                        'continent': {'names': {'en': 'Testcontinent'}}})
     if invalid_location:
         data = encode({'country': {'names': {'en': 'Testland'}},
-                       'location': {'latitude': 91.0, 'longitude': 181.0}})
+                       'location': {'latitude': 91.0, 'longitude': 181.0,
+                                    'accuracy_radius': 1000}})
     if registered:
         data = encode({'registered_country': {'names': {'en': 'Registrationland'}}})
     if asn:

@@ -74,6 +74,13 @@ function Provider:lookup(ip)
        coordinate(location.latitude, 90) and
        coordinate(location.longitude, 180) then
       result.latitude, result.longitude = location.latitude, location.longitude
+      -- GeoLite2 expresses its estimated uncertainty in kilometres. A radius
+      -- only has meaning when the database supplied valid coordinates.
+      local radius = location.accuracy_radius
+      if type(radius) == "number" and radius == radius and
+         radius >= 0 and radius < math.huge and radius % 1 == 0 then
+        result.accuracy_radius_km = radius
+      end
     end
   end
   if type(asn) == "table" then

@@ -30,7 +30,11 @@ Provider selection is via `geolocation.provider`; currently only the offline
 A GeoLite2 City or Country database can be used as the primary database. City
 provides coordinates when available; Country does not. An optional GeoLite2
 ASN MMDB supplies ASN details. A country-only record remains a valid lookup,
-but never creates synthetic map coordinates. Databases are **not** redistributed
+but never creates synthetic map coordinates. `registered_country` identifies
+where an address block was registered, not necessarily where its IP is located;
+registration-only results are labeled separately. When City provides coordinates,
+`accuracy_radius_km` is retained in structured results and traceroute KML
+metadata. The radius is an estimate, not a claim of precise device location. Databases are **not** redistributed
 here. The examples below use
 [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb), a third-party
 mirror of MaxMind's GeoLite2 data. For regular updates, prefer MaxMind's

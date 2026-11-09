@@ -64,7 +64,12 @@ local function write_kml(path, points)
   -- router route that an IP geolocation database cannot establish.
   for _, p in ipairs(points) do
     f:write('<Placemark><name>', escape_xml("Hop " .. p.hop .. ": " .. p.ip),
-      '</name><Point><coordinates>', string.format("%.7f,%.7f,0", p.lon, p.lat),
+      '</name>')
+    if p.accuracy_radius_km then
+      f:write('<ExtendedData><Data name="accuracy_radius_km"><value>',
+        tostring(p.accuracy_radius_km), '</value></Data></ExtendedData>')
+    end
+    f:write('<Point><coordinates>', string.format("%.7f,%.7f,0", p.lon, p.lat),
       '</coordinates></Point></Placemark>\n')
   end
   f:write('</Document></kml>\n')
@@ -110,8 +115,10 @@ local function run(host)
             result.longitude, result.country or "Unknown",
             result.city and (" (" .. result.city .. ")") or "")
           row.latitude, row.longitude = result.latitude, result.longitude
+          row.accuracy_radius_km = result.accuracy_radius_km
           points[#points + 1] = { hop = hop_number, ip = ip,
-            lat = result.latitude, lon = result.longitude }
+            lat = result.latitude, lon = result.longitude,
+            accuracy_radius_km = result.accuracy_radius_km }
           geoip.add(ip, result.latitude, result.longitude)
         elseif result.status == "country-only" then
           geographic = result.country or result.continent or result.city
