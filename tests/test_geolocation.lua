@@ -78,4 +78,11 @@ local absent, reason = geolocation.open({provider="geoplugin", db=root .. "city-
 assert(absent == nil and reason:find("unsupported"))
 absent, reason = geolocation.open({db=root .. "invalid.mmdb"})
 assert(absent == nil and reason:find("marker"))
+-- A malformed record is a lookup error, never a successful "no record".
+provider = assert(geolocation.open({db=root .. "pointer-outside.mmdb"}))
+local bad_record, bad_reason = provider:lookup("142.251.110.101")
+assert(bad_record == nil and bad_reason:find("geographic lookup:", 1, true))
+assert(bad_reason:find("data pointer outside section", 1, true))
+provider:close()
+
 print("Geolocation provider: PASS (coordinates, country-only, ASN, CGNAT, errors)")

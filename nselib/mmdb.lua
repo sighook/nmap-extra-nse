@@ -155,6 +155,7 @@ local function node_record(db, node, bit)
 end
 
 function Reader:lookup(ip)
+  if not self.file then return nil, "MMDB reader is closed" end
   local bytes, err = ipOps.ip_to_str(ip)
   if not bytes then return nil, err or "invalid IP address" end
   if #bytes ~= 4 and #bytes ~= 16 then return nil, "invalid IP length" end

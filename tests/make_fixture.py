@@ -91,6 +91,43 @@ def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=
     Path(path).write_bytes(blob)
 
 
+def make_malformed(directory):
+    """Mutate a valid tiny database to exercise bounded reader failures.
+
+    Preserve the normal metadata and search tree unless the specific case
+    requires changing them. This keeps each fixture's failure unambiguous.
+    """
+    baseline = (directory / 'city-24.mmdb').read_bytes()
+    marker_at = baseline.rfind(MARKER)
+    assert marker_at >= 22  # One six-byte node and the 16-byte separator.
+    tree, separator = baseline[:6], baseline[6:22]
+    data, metadata = baseline[22:marker_at], baseline[marker_at:]
+
+    def emit(name, *, new_tree=tree, new_separator=separator,
+             new_data=data, new_metadata=metadata):
+        (directory / name).write_bytes(
+            new_tree + new_separator + new_data + new_metadata)
+
+    emit('bad-separator.mmdb', new_separator=b'\1' + bytes(15))
+    emit('bad-tree-size.mmdb', new_metadata=metadata.replace(
+        encode('node_count') + encode(1),
+        encode('node_count') + encode(200), 1))
+    emit('bad-version.mmdb', new_metadata=metadata.replace(
+        encode('binary_format_major_version') + encode(2),
+        encode('binary_format_major_version') + encode(3), 1))
+    emit('pointer-outside.mmdb', new_tree=node(24, 1, 0xffffff))
+    emit('truncated-value.mmdb', new_data=size_type(2, 5) + b'xy')
+    # Pointer at the start of the data section references itself forever.
+    emit('cyclic-pointer.mmdb', new_data=b'\x20\x00')
+    # Encode a payload length beyond the decoder's 2 MiB budget. No need to
+    # allocate the advertised payload: the reader must reject it first.
+    oversized = 2 * 1024 * 1024 + 1
+    emit('oversized-value.mmdb', new_data=b'\x5f' +
+         (oversized - 65821).to_bytes(3, 'big'))
+    emit('oversized-container.mmdb', new_data=size_type(11, 16385))
+    emit('unsupported-type.mmdb', new_data=size_type(12, 0))
+
+
 if __name__ == '__main__':
     for size in (24, 28, 32):
         make(Path(sys.argv[1]) / f'city-{size}.mmdb', size)
@@ -101,3 +138,4 @@ if __name__ == '__main__':
     make(Path(sys.argv[1]) / 'invalid-location.mmdb', 24, invalid_location=True)
     make(Path(sys.argv[1]) / 'registered.mmdb', 24, registered=True)
     (Path(sys.argv[1]) / 'invalid.mmdb').write_bytes(b'not a maxmind database')
+    make_malformed(Path(sys.argv[1]))

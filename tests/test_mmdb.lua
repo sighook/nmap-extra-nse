@@ -44,4 +44,49 @@ assert(record.first == "referenced" and record.other == "inline")
 pointer:close()
 local broken, err = mmdb.open(base .. "/tests/fixtures/invalid.mmdb")
 assert(broken == nil and err:find("marker"))
-print("MMDB reader: PASS (24/28/32, IPv4 in IPv6, pointers, missing data, malformed DB)")
+-- Opening a malformed database must fail cleanly and close the file it opened.
+local real_open, last_file = io.open, nil
+io.open = function(path, mode)
+  local handle, why = real_open(path, mode)
+  if handle then last_file = handle end
+  return handle, why
+end
+local invalid, separator_err = mmdb.open(base .. "/tests/fixtures/bad-separator.mmdb")
+io.open = real_open
+assert(invalid == nil and separator_err:find("invalid data section separator", 1, true))
+assert(last_file and io.type(last_file) == "closed file", "failed open must close file")
+
+for filename, expected in pairs({
+  ["bad-tree-size.mmdb"] = "invalid tree size",
+  ["bad-version.mmdb"] = "unsupported or invalid metadata",
+}) do
+  local value, reason = mmdb.open(base .. "/tests/fixtures/" .. filename)
+  assert(value == nil and reason:find(expected, 1, true), filename .. ": " .. tostring(reason))
+end
+
+-- Corrupted records should fail within the decoder's budgets, not loop,
+-- allocate the advertised payload, or read through the metadata section.
+for filename, expected in pairs({
+  ["pointer-outside.mmdb"] = "data pointer outside section",
+  ["truncated-value.mmdb"] = "offset outside database",
+  ["cyclic-pointer.mmdb"] = "maximum nesting depth exceeded",
+  ["oversized-value.mmdb"] = "decoded payload limit exceeded",
+  ["oversized-container.mmdb"] = "container too large",
+  ["unsupported-type.mmdb"] = "unsupported data type",
+}) do
+  local reader, why = mmdb.open(base .. "/tests/fixtures/" .. filename)
+  assert(reader, filename .. ": " .. tostring(why))
+  local ok, problem = pcall(reader.lookup, reader, "142.251.110.101")
+  assert(not ok and tostring(problem):find(expected, 1, true),
+    filename .. ": " .. tostring(problem))
+  reader:close()
+end
+
+local closed = assert(mmdb.open(base .. "/tests/fixtures/city-24.mmdb"))
+local handle = closed.file
+closed:close()
+closed:close()  -- Idempotent cleanup.
+assert(io.type(handle) == "closed file", "close must release the descriptor")
+local after_close, close_reason = closed:lookup("142.251.110.101")
+assert(after_close == nil and close_reason == "MMDB reader is closed")
+print("MMDB reader: PASS (records, corrupt files, limits, file lifecycle)")
