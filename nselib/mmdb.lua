@@ -181,7 +181,9 @@ function Reader:lookup(ip)
   if offset < self.data_start or offset >= self.metadata_marker then
     fail("data pointer outside section")
   end
-  return decode(self, offset, self.data_start, self.metadata_marker)
+  -- decode also returns its internal cursor; lookup exposes only the record.
+  local record = decode(self, offset, self.data_start, self.metadata_marker)
+  return record
 end
 
 local function open_reader(path)
