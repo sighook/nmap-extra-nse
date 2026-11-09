@@ -64,7 +64,9 @@ function Provider:lookup(ip)
 
   local result = {}
   if type(city) == "table" then
-    result.country = english(city.country) or english(city.registered_country)
+    -- Network registration is not evidence of the IP's physical location.
+    result.country = english(city.country)
+    result.registered_country = english(city.registered_country)
     result.city = english(city.city)
     result.continent = english(city.continent)
     local location = city.location
@@ -87,6 +89,8 @@ function Provider:lookup(ip)
     result.status = "located"
   elseif result.country or result.city or result.continent then
     result.status = "country-only"
+  elseif result.registered_country then
+    result.status = "registered-only"
   elseif result.asn or result.organization then
     result.status = "asn-only"
   else

@@ -63,6 +63,9 @@ action = function(host)
     if #location > 0 then
       lines[#lines + 1] = "location: " .. table.concat(location, ", ")
     end
+    if result.registered_country and result.registered_country ~= result.country then
+      lines[#lines + 1] = "registered country: " .. result.registered_country
+    end
     if result.latitude then
       lines[#lines + 1] = string.format("coordinates: %.5f, %.5f",
         result.latitude, result.longitude)

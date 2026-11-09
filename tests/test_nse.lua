@@ -23,6 +23,7 @@ package.preload.ipOps = function()
   }
 end
 local registered = {}
+local active_db = "city-24.mmdb"
 package.preload.geoip = function()
   return { add = function(ip, latitude, longitude)
     registered[ip] = {latitude, longitude}
@@ -32,7 +33,7 @@ package.preload.nmap = function() return { fetchfile = function() return nil end
 package.preload.stdnse = function()
   return {
     get_script_args = function(key)
-      if key == SCRIPT_NAME .. ".db" then return base .. "/tests/fixtures/city-24.mmdb" end
+      if key == SCRIPT_NAME .. ".db" then return base .. "/tests/fixtures/" .. active_db end
       if key == SCRIPT_NAME .. ".asn" then return base .. "/tests/fixtures/asn.mmdb" end
       if key == SCRIPT_NAME .. ".kmlfile" then return base .. "/tests/fixtures/output.kml" end
     end,
@@ -82,4 +83,17 @@ local kml = f:read("*a"); f:close()
 assert(kml:find("142.251.110.101", 1, true))
 assert(kml:find("28.9876500,47.1234500,0", 1, true))
 assert(not kml:find("100.64.87.254", 1, true))
-print("NSE integration: PASS (private/CGNAT, missing, found, timeout, ASN, KML)")
+-- An ASN/registration record must not be presented as physical geography.
+active_db = "registered.mmdb"
+registered["142.251.110.101"] = nil
+assert(loadfile(base .. "/scripts/traceroute-geolocation-mmdb.nse"))()
+local registered_rows, registered_display = action(host)
+assert(registered_rows[4].status == "registered-only")
+assert(registered_rows[4].country == nil)
+assert(registered_rows[4].registered_country == "Registrationland")
+assert(registered_display:find("registered: Registrationland", 1, true))
+assert(registered["142.251.110.101"] == nil)
+local rf = assert(io.open(base .. "/tests/fixtures/output.kml", "r"))
+local rxml = rf:read("*a"); rf:close()
+assert(not rxml:find("142.251.110.101", 1, true))
+print("NSE integration: PASS (private/CGNAT, missing, found, timeout, ASN, KML, registration)")

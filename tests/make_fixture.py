@@ -44,7 +44,7 @@ def node(record_size, left, right):
     raise ValueError(record_size)
 
 
-def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=False, invalid_location=False):
+def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=False, invalid_location=False, registered=False):
     # One-node tree, left half: no data, right half: City record.
     data = encode({'country': {'names': {'en': 'Testland'}},
                    'city': {'names': {'en': 'Testville'}},
@@ -55,6 +55,8 @@ def make(path, record_size=24, ip_version=4, pointers=False, asn=False, country=
     if invalid_location:
         data = encode({'country': {'names': {'en': 'Testland'}},
                        'location': {'latitude': 91.0, 'longitude': 181.0}})
+    if registered:
+        data = encode({'registered_country': {'names': {'en': 'Registrationland'}}})
     if asn:
         data = encode({'autonomous_system_number': 13335,
                        'autonomous_system_organization': 'Test ISP'})
@@ -95,4 +97,5 @@ if __name__ == '__main__':
     make(Path(sys.argv[1]) / 'asn.mmdb', 24, asn=True)
     make(Path(sys.argv[1]) / 'country.mmdb', 24, country=True)
     make(Path(sys.argv[1]) / 'invalid-location.mmdb', 24, invalid_location=True)
+    make(Path(sys.argv[1]) / 'registered.mmdb', 24, registered=True)
     (Path(sys.argv[1]) / 'invalid.mmdb').write_bytes(b'not a maxmind database')

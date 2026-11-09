@@ -115,6 +115,8 @@ local function run(host)
           geoip.add(ip, result.latitude, result.longitude)
         elseif result.status == "country-only" then
           geographic = result.country or result.continent or result.city
+        elseif result.status == "registered-only" then
+          geographic = "registered: " .. result.registered_country
         elseif result.status == "asn-only" then
           geographic = "no geographic record"
         elseif result.status == "non-public" then
@@ -122,6 +124,7 @@ local function run(host)
         end
         row.country, row.city, row.continent = result.country,
           result.city, result.continent
+        row.registered_country = result.registered_country
       end
       tab.addrow(output, hop_number, rtt and string.format("%.2f ms", rtt) or "-",
         label, geographic, asn_label)
