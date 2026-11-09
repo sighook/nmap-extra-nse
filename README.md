@@ -1,11 +1,12 @@
 # nmap-extra-nse
 
-Personal NSE scripts and an archive of third-party scripts proposed to Nmap.
+Two maintained scripts for offline IP geolocation, alongside a historical
+archive of scripts proposed to Nmap by various authors.
 
-The two collections have different ownership and maintenance expectations:
+These parts have different ownership and maintenance expectations:
 
 - **`scripts/`, `nselib/`, `tests/`** — independently maintained code in this repository.
-- **`contrib/`** — snapshots copied from upstream [Nmap pull requests](https://github.com/nmap/nmap/pulls); the numeric prefix is the PR number, **not a version**. Original authorship and licensing remain with the contributors.
+- **`contrib/`** — snapshots from [Nmap pull requests](https://github.com/nmap/nmap/pulls), including the maintainer's own submissions and other authors' work. The numeric prefix is a PR number, **not a version**. Authorship and licensing remain with each original contributor.
 - **`archive/`** — broken snapshots or files conflicting with an already-shipped Nmap script. Retained for provenance; **do not install**.
 
 See [CONTRIB.md](CONTRIB.md) for the upstream status audit and exceptions.
@@ -14,9 +15,9 @@ security, correctness, or compatibility with current NSE libraries.
 
 ## Offline IP geolocation
 
-Nmap ships a handful of geolocation scripts, but some still depend on dead
-web APIs or the old MaxMind `.dat` format. These two scripts use local GeoLite2
-MMDB databases instead. They make no HTTP requests during a scan.
+The maintained scripts read local GeoLite2 MMDB databases, rather than
+querying a geolocation web service or using the legacy MaxMind `.dat` format.
+They make no HTTP requests during a scan.
 
 - `ip-geolocation-mmdb.nse`: look up scanned addresses. Coordinates, when
   present, are also published to Nmap's `geoip` registry for its map exporters.
@@ -35,8 +36,8 @@ draw a physical route between guessed points.
 ### Get it running
 
 You need Nmap and GNU Make. For downloading and checking databases, install
-`curl` and `mmdblookup` (Debian/Kali package: `mmdb-bin`). For the offline
-tests, you need Python 3 and Lua 5.4.
+`curl` and `mmdblookup` (package `mmdb-bin` on Debian-derived systems).
+For the offline tests, you need Python 3 and Lua 5.4.
 
 From this repository:
 
@@ -48,10 +49,11 @@ sudo make install   # the maintained NSE files + downloaded databases
 ```
 
 `make fetch` downloads from [P3TERX/GeoLite.mmdb](https://github.com/P3TERX/GeoLite.mmdb),
-a third-party mirror. It checks that all three files can be opened by
-`mmdblookup` before replacing your previous downloads. The downloaded files
-are ignored by Git. **`make install` never downloads anything**; if the
-local databases are missing or invalid, it stops and tells you.
+a third-party mirror. Before installing the downloads, `mmdblookup` checks
+that each file can be read as an MMDB. This is a format check, not proof of
+provenance or of the database edition. Downloads are ignored by Git.
+**`make install` never downloads anything**; missing or unreadable local
+databases cause an error.
 
 If you only need part of the installation:
 
@@ -60,11 +62,12 @@ sudo make install-nse     # two NSE scripts + two Lua libraries
 sudo make install-db      # the three databases from ./data/
 ```
 
-Only `scripts/` and `nselib/` are installed. The old submissions in `contrib/`
-and `archive/` are deliberately left alone.
+Only the two maintained scripts, their Lua libraries and the GeoLite2 MMDB
+files are installed. Historical files in `contrib/` and `archive/` are left alone.
 
-The default destination is `/usr/share/nmap`, as used by our Kali lab. On
-systems with a different Nmap data directory, override it explicitly:
+The default destination is `/usr/share/nmap`, a common Linux package layout.
+The Makefile does not discover Nmap's data directory. If yours differs,
+set `NMAP_DATADIR` explicitly:
 
 ```sh
 make show-config NMAP_DATADIR=/opt/nmap/share/nmap
@@ -81,8 +84,8 @@ make install DESTDIR=/tmp/nmap-stage
 The databases are installed in `nselib/data/` under the selected Nmap data
 directory. You can also supply pre-downloaded MMDB files via `DB_DIR`, or
 change the mirror with `DB_URL`. See `make show-config` before overriding
-paths. Neither the databases nor your lab's Docker image belongs in this
-repository: the Kali lab selects and pins its own version of this project.
+paths. The Makefile installs maintained NSE components, not the archived
+third-party scripts; no database files are committed to this repository.
 
 GeoLite2 data changes over time. For long-term use, prefer MaxMind's official
 [`geoipupdate`](https://dev.maxmind.com/geoip/updating-databases/) with your
@@ -92,7 +95,7 @@ A successful download does not certify the accuracy of an IP location.
 
 ### Run the scripts
 
-On Kali, after installing to the default data directory:
+After installing to the default `/usr/share/nmap` directory:
 
 ```sh
 DB=/usr/share/nmap/nselib/data
@@ -123,11 +126,11 @@ available accuracy radii as `ExtendedData`. KML output is **point-only** and
 uses longitude,latitude order. Use a separate KML file per target so you do
 not overwrite earlier results.
 
-Use absolute `--script` paths if you have not registered the scripts with
-Nmap's script database. There is no need to run `nmap --script-updatedb`,
-which can fail in restricted container builds due to executable capabilities.
+The examples use absolute `--script` paths, so they do not require changing
+Nmap's installed script database. Output depends on the MMDB edition and date;
+not every public address has coordinates.
 
-### Testing and what we've actually checked
+### Tests and verification
 
 `make check` generates small deterministic MMDB fixtures (24/28/32-bit tree
 records, IPv4/IPv6 paths, pointers and malformed files) and runs the Lua
@@ -138,22 +141,20 @@ make check
 make clean           # removes only synthetic fixtures, never ./data/
 ```
 
-In the Kali lab, we also exercised Nmap 7.991 against real GeoLite2 City,
-Country and ASN databases: IPv4 and IPv6 host lookups, `mmdblookup` reference
-comparisons, registration-only records, traceroute ASN enrichment, KML export,
-and a 256-address local lookup batch. IPv6 lookup worked **without** an IPv6
-route (`-Pn`); a real IPv6 traceroute was unavailable because the host network
-had no global IPv6 address or default route. We make no claim that it was
-tested over a working IPv6 path.
+Manual integration checks have also been performed with Nmap 7.991 and
+GeoLite2 City, Country and ASN databases: selected IPv4/IPv6 host lookups,
+comparison with `mmdblookup`, traceroute ASN enrichment, KML export and a
+256-address offline lookup batch. These are **not** part of `make check`, and
+they do not establish compatibility with every Nmap or MMDB release. A live
+IPv6 traceroute has not been verified.
 
-These integration results establish a useful baseline, not compatibility
-with every database revision or every version of Nmap. If something goes
-wrong, compare the same IP against `mmdblookup` using the same MMDB files
-before blaming the network or the reader.
+When a lookup disagrees with expectations, use `mmdblookup` on the *same IP*
+and the *same database file* before investigating the NSE decoder.
 
-## Third-party PR snapshots
+## Nmap PR snapshots
 
 The `contrib/` directory is a source archive, not an install-all directory.
+It includes scripts from different authors; it is not a set of supported releases.
 Some submissions make state-changing or exploit requests; run only against
 systems where you have authorization. Review each script and its external
 resources before use. PR-number prefixes are part of this archive's provenance,

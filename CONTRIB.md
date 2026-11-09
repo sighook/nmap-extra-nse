@@ -1,8 +1,10 @@
 # Nmap pull-request archive
 
-The files under `contrib/` are **snapshots from other authors' Nmap PRs**, not
-original scripts authored or maintained by this repository. Numeric filename
-prefixes identify [nmap/nmap PRs](https://github.com/nmap/nmap/pulls).
+The files under `contrib/` are archived snapshots of Nmap pull requests,
+including submissions by this repository's maintainer and by other authors.
+They are preserved for reference, not presented as currently maintained or
+ready to install. Numeric filename prefixes identify
+[nmap/nmap PRs](https://github.com/nmap/nmap/pulls).
 
 Audited **2026-11-09** against upstream PR state and the Nmap GitHub source
 tree. "Open" means GitHub reports the PR as open, not that the submission is

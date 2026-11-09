@@ -13,8 +13,9 @@ geolocation database estimates, not verified physical router positions.
 
 ---
 -- @usage
--- nmap -sn --traceroute --script traceroute-geolocation-mmdb \
---   --script-args traceroute-geolocation-mmdb.db=/usr/share/GeoIP/GeoLite2-City.mmdb example.com
+-- nmap -sn --traceroute \
+--   --script /usr/share/nmap/scripts/traceroute-geolocation-mmdb.nse \
+--   --script-args traceroute-geolocation-mmdb.db=/usr/share/nmap/nselib/data/GeoLite2-City.mmdb example.com
 --
 -- @args geolocation.provider Lookup provider (currently mmdb; offline only).
 -- @args traceroute-geolocation-mmdb.db Path to GeoLite2 City or Country MMDB.
@@ -24,14 +25,8 @@ geolocation database estimates, not verified physical router positions.
 --
 -- @output
 -- | traceroute-geolocation-mmdb:
--- |   HOP  RTT      ADDRESS              GEOLOCATION                   ASN
--- |   1    1.23 ms  192.168.1.1          non-public                    -
--- |   2    5.67 ms  203.0.113.20         no MMDB record                -
--- |_  3    8.90 ms  1.1.1.1              37.75,-97.82 United States   AS13335
---
--- @xmloutput
--- <table><elem key="hop">1</elem><elem key="ip">192.168.1.1</elem>
--- <elem key="status">non-public</elem></table>
+-- |   HOP  RTT      ADDRESS          GEOLOCATION                         ASN
+-- |_  1    1.23 ms  192.168.1.1    non-public                          -
 
 author = "sighook and contributors"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"

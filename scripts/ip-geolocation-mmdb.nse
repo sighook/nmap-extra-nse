@@ -11,8 +11,8 @@ coordinates exist, registers them for Nmap's existing geolocation map scripts.
 
 ---
 -- @usage
--- nmap -sn --script ip-geolocation-mmdb \
---   --script-args ip-geolocation-mmdb.db=/usr/share/GeoIP/GeoLite2-City.mmdb example.com
+-- nmap -sn -Pn -n --script /usr/share/nmap/scripts/ip-geolocation-mmdb.nse \
+--   --script-args ip-geolocation-mmdb.db=/usr/share/nmap/nselib/data/GeoLite2-City.mmdb 8.8.8.8
 --
 -- @args geolocation.provider Lookup provider (currently mmdb; offline only).
 -- @args ip-geolocation-mmdb.db Path to GeoLite2 City or Country MMDB.
@@ -20,9 +20,9 @@ coordinates exist, registers them for Nmap's existing geolocation map scripts.
 --
 -- @output
 -- | ip-geolocation-mmdb:
--- |   location: Testville, Testland
--- |   coordinates: 47.12345, 28.98765
--- |_  ASN: AS13335 (Test ISP)
+-- |   location: United States, North America
+-- |   coordinates: 37.75100, -97.82200
+-- |_  accuracy radius: 1000 km
 
 author = "sighook and contributors"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
