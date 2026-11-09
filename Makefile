@@ -64,8 +64,10 @@ check-db:
 	    fi; \
 	  done
 
-# Install never downloads. Fail early if the local databases aren't ready.
-install: check-db install-nse install-db
+# Check databases before running either installation recipe, including
+# with make -j. install-nse remains usable on its own without databases.
+install: check-db
+	@$(MAKE) install-nse install-db
 
 install-nse:
 	@'$(INSTALL)' -d '$(DESTDIR)$(NMAP_DATADIR)/nselib' '$(DESTDIR)$(NMAP_DATADIR)/scripts'
