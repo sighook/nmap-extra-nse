@@ -10,6 +10,7 @@ These parts have different ownership and maintenance expectations:
 - **`archive/`** — broken snapshots or files conflicting with an already-shipped Nmap script. Retained for provenance; **do not install**.
 
 See [CONTRIB.md](CONTRIB.md) for the upstream status audit and exceptions.
+Release history is in [NEWS.md](NEWS.md).
 These files are **not all part of official Nmap**. PR state is not an assessment of
 security, correctness, or compatibility with current NSE libraries.
 
