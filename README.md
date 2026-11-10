@@ -115,10 +115,12 @@ nmap -sn -n --traceroute \
 ```
 
 Switch to `GeoLite2-Country.mmdb` with the `.db` argument when you only need
-country-level data. ASN lookups are optional; omit the `.asn` argument to skip
-them. An absent database or unsupported provider is an explicit error, not a
-fallback to a network geolocation service. The currently supported backend is
-`geolocation.provider=mmdb`.
+country-level data. Both scripts automatically use `GeoLite2-ASN.mmdb` when
+Nmap finds it in `nselib/data/`. The `.asn` argument overrides that discovery;
+without an ASN database, geographic lookup still works but has no ASN output.
+An absent geographic database or unsupported provider is an explicit error,
+not a fallback to a network geolocation service. The currently supported
+backend is `geolocation.provider=mmdb`.
 
 The upstream `ip-geolocation-map-kml.nse` can use our host script's registered
 coordinates in the same scan. It only receives latitude/longitude, though:

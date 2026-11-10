@@ -22,13 +22,19 @@ package.preload.ipOps = function()
 end
 local registered = {}
 local active_db = "city-24.mmdb"
+local available_asn = true
+local asn_override
 package.preload.geoip = function()
   return { add = function(ip, lat, lon)
     registered[ip] = {lat, lon}
   end }
 end
 package.preload.nmap = function()
-  return {fetchfile = function() return nil end}
+  return { fetchfile = function(name)
+    if name == "nselib/data/GeoLite2-ASN.mmdb" and available_asn then
+      return base .. "/tests/fixtures/asn.mmdb"
+    end
+  end }
 end
 package.preload.stdnse = function()
   return {
@@ -37,7 +43,7 @@ package.preload.stdnse = function()
         return base .. "/tests/fixtures/" .. active_db
       end
       if key == SCRIPT_NAME .. ".asn" then
-        return base .. "/tests/fixtures/asn.mmdb"
+        return asn_override
       end
     end,
     format_output = function(_, value) return value end,
@@ -78,4 +84,28 @@ assert(registered_record.country == nil and registered_record.registered_country
 assert(registered_text:find("registered country: Registrationland", 1, true))
 assert(not registered_text:find("location:", 1, true))
 assert(registered[host.ip] == nil)
-print("Host NSE: PASS (located, country-only, registered-only, ASN, private, geoip publication)")
+
+-- Default: discover the installed ASN database without a script argument.
+-- The initial located result above already exercises this path.
+-- Missing optional ASN database must not break geographic lookups.
+active_db = "city-24.mmdb"
+available_asn = false
+assert(loadfile(base .. "/scripts/ip-geolocation-mmdb.nse"))()
+local without_asn, without_asn_text = action(host)
+assert(without_asn.status == "located" and without_asn.asn == nil)
+assert(not without_asn_text:find("ASN:", 1, true))
+
+-- An explicit path works even when automatic discovery finds nothing.
+asn_override = base .. "/tests/fixtures/asn.mmdb"
+assert(loadfile(base .. "/scripts/ip-geolocation-mmdb.nse"))()
+local explicit, explicit_text = action(host)
+assert(explicit.asn == 13335 and explicit_text:find("AS13335", 1, true))
+
+-- Explicit errors must not be hidden by an otherwise available default.
+available_asn = true
+asn_override = base .. "/tests/fixtures/invalid.mmdb"
+assert(loadfile(base .. "/scripts/ip-geolocation-mmdb.nse"))()
+local err_text = action(host)
+assert(type(err_text) == "string" and err_text:find("ERROR:", 1, true))
+
+print("Host NSE: PASS (located, country-only, registered-only, ASN discovery/override, private, geoip publication)")

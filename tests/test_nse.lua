@@ -24,17 +24,25 @@ package.preload.ipOps = function()
 end
 local registered = {}
 local active_db = "city-24.mmdb"
+local available_asn = true
+local asn_override
 package.preload.geoip = function()
   return { add = function(ip, latitude, longitude)
     registered[ip] = {latitude, longitude}
   end }
 end
-package.preload.nmap = function() return { fetchfile = function() return nil end } end
+package.preload.nmap = function()
+  return { fetchfile = function(name)
+    if name == "nselib/data/GeoLite2-ASN.mmdb" and available_asn then
+      return base .. "/tests/fixtures/asn.mmdb"
+    end
+  end }
+end
 package.preload.stdnse = function()
   return {
     get_script_args = function(key)
       if key == SCRIPT_NAME .. ".db" then return base .. "/tests/fixtures/" .. active_db end
-      if key == SCRIPT_NAME .. ".asn" then return base .. "/tests/fixtures/asn.mmdb" end
+      if key == SCRIPT_NAME .. ".asn" then return asn_override end
       if key == SCRIPT_NAME .. ".kmlfile" then return base .. "/tests/fixtures/output.kml" end
     end,
     format_output = function(_, output) return output end,
@@ -98,4 +106,27 @@ assert(registered["142.251.110.101"] == nil)
 local rf = assert(io.open(base .. "/tests/fixtures/output.kml", "r"))
 local rxml = rf:read("*a"); rf:close()
 assert(not rxml:find("142.251.110.101", 1, true))
-print("NSE integration: PASS (private/CGNAT, missing, found, timeout, ASN, KML, registration)")
+
+-- The initial lookup found ASN through nmap.fetchfile(), not script args.
+-- Without a bundled ASN database, geographic lookup is still available.
+active_db = "city-24.mmdb"
+available_asn = false
+assert(loadfile(base .. "/scripts/traceroute-geolocation-mmdb.nse"))()
+local without_asn_rows, without_asn_text = action(host)
+assert(without_asn_rows[4].status == "located" and without_asn_rows[4].asn == nil)
+assert(not without_asn_text:find("AS13335", 1, true))
+
+-- An explicit ASN path works without automatic discovery.
+asn_override = base .. "/tests/fixtures/asn.mmdb"
+assert(loadfile(base .. "/scripts/traceroute-geolocation-mmdb.nse"))()
+local explicit_rows = action(host)
+assert(explicit_rows[4].asn == 13335)
+
+-- An invalid explicit path is an error, not an invitation to fall back.
+available_asn = true
+asn_override = base .. "/tests/fixtures/invalid.mmdb"
+assert(loadfile(base .. "/scripts/traceroute-geolocation-mmdb.nse"))()
+local err_text = action(host)
+assert(type(err_text) == "string" and err_text:find("ERROR:", 1, true))
+
+print("NSE integration: PASS (private/CGNAT, missing, found, timeout, ASN discovery/override, KML, registration)")

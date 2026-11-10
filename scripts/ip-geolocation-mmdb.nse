@@ -16,7 +16,8 @@ coordinates exist, registers them for Nmap's existing geolocation map scripts.
 --
 -- @args geolocation.provider Lookup provider (currently mmdb; offline only).
 -- @args ip-geolocation-mmdb.db Path to GeoLite2 City or Country MMDB.
--- @args ip-geolocation-mmdb.asn Optional path to GeoLite2 ASN MMDB.
+-- @args ip-geolocation-mmdb.asn Optional override for GeoLite2 ASN MMDB;
+--       by default, searches Nmap's data directory.
 --
 -- @output
 -- | ip-geolocation-mmdb:
@@ -32,7 +33,8 @@ local provider_name = stdnse.get_script_args("geolocation.provider") or "mmdb"
 local db_path = stdnse.get_script_args(SCRIPT_NAME .. ".db") or
   nmap.fetchfile("nselib/data/GeoLite2-City.mmdb") or
   "/usr/share/GeoIP/GeoLite2-City.mmdb"
-local asn_path = stdnse.get_script_args(SCRIPT_NAME .. ".asn")
+local asn_path = stdnse.get_script_args(SCRIPT_NAME .. ".asn") or
+  nmap.fetchfile("nselib/data/GeoLite2-ASN.mmdb")
 
 hostrule = function(host)
   return host.ip ~= nil

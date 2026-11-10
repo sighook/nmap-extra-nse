@@ -1,5 +1,11 @@
 # NEWS
 
+## Unreleased
+
+- Discover `GeoLite2-ASN.mmdb` automatically in Nmap's data directory when
+  neither geolocation script is given an explicit `.asn` path. Geographic
+  lookups continue without ASN data if the file is absent.
+
 ## v0.1
 
 First release of the maintained offline geolocation scripts. They read local

@@ -19,7 +19,8 @@ geolocation database estimates, not verified physical router positions.
 --
 -- @args geolocation.provider Lookup provider (currently mmdb; offline only).
 -- @args traceroute-geolocation-mmdb.db Path to GeoLite2 City or Country MMDB.
--- @args traceroute-geolocation-mmdb.asn Optional path to GeoLite2 ASN database.
+-- @args traceroute-geolocation-mmdb.asn Optional override for GeoLite2 ASN MMDB;
+--       by default, searches Nmap's data directory.
 -- @args traceroute-geolocation-mmdb.kmlfile Optional KML file for point markers;
 --       use with a single target to avoid overwriting between hosts.
 --
@@ -38,7 +39,8 @@ local provider_name = stdnse.get_script_args("geolocation.provider") or "mmdb"
 local db_path = stdnse.get_script_args(basename .. ".db") or
   nmap.fetchfile("nselib/data/GeoLite2-City.mmdb") or
   "/usr/share/GeoIP/GeoLite2-City.mmdb"
-local asn_path = stdnse.get_script_args(basename .. ".asn")
+local asn_path = stdnse.get_script_args(basename .. ".asn") or
+  nmap.fetchfile("nselib/data/GeoLite2-ASN.mmdb")
 local kml_path = stdnse.get_script_args(basename .. ".kmlfile")
 
 hostrule = function(host)
